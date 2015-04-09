@@ -26,8 +26,9 @@ import ycm_core
 flags = [
 '-Wall',
 '-Wextra',
-'-std=c++11',
+'-std=c++1y',
 '-x', 'c++',
+'-isystem', '/usr/include/c++/4.8',
 '-I', 'include',
 ]
 

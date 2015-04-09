@@ -7,7 +7,7 @@ SOURCES := $(shell find $(SRCDIR) -type f -name *.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
 
 DEPENDS := $(OBJECTS:.o=.d)
-CXXFLAGS := -Wall -Wextra -MMD -Iinclude -std=c++0x  -O3 
+CXXFLAGS := -Wall -Wextra -MMD -Iinclude -std=c++11  -O3 
 
 # set V='' to enable verbose output
 override V ?= @

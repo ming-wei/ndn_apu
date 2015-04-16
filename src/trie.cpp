@@ -4,8 +4,35 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <set>
+#include <limits>
+#include <cstring>
 
 #include "common.h"
+
+bool can_allocate(std::shared_ptr<TrieNode> p, int id, std::set<int> &occupied)
+{
+    if (occupied.find(id) != occupied.end()) return false;
+    for (auto it: p->childs()) {
+        char c = it.first;
+        if (occupied.find(id + c) != occupied.end()) return false;
+    }
+    return true;
+}
+
+void allocate_recursive(std::shared_ptr<TrieNode> p, int &id, 
+        std::set<int> &occupied)
+{
+    while (!can_allocate(p, id, occupied)) ++id;
+    p->id(id++);
+    for (auto it: p->childs()) {
+        char c = it.first;
+        occupied.insert(p->id() + c);
+    }
+    for (auto it: p->childs()) {
+        allocate_recursive(it.second, id, occupied);
+    }
+}
 
 Trie::Trie(const std::vector<std::string> &fib_fnames)
 {
@@ -15,6 +42,15 @@ Trie::Trie(const std::vector<std::string> &fib_fnames)
         this->load_file(fib_fname);
     }
     std::cerr << "Constructing trie completed." << std::endl;
+}
+
+size_t _get_size(std::shared_ptr<TrieNode> p);
+
+void Trie::allocate_id()
+{
+    std::set<int> occupied;
+    int cur_id = 0;
+    allocate_recursive(m_root, cur_id, occupied);
 }
 
 void Trie::load_file(const std::string &fib_fname)
@@ -52,13 +88,15 @@ void Trie::insert_entry(const std::string &path, int port)
     p->port(port);
 }
 
-int Trie::query_port(const std::string &q)
+int Trie::query_port(const std::string &q) const
 {
     auto p = m_root;
-    int result = -1;
+    int result = p->port();
+    //printf("trie %d\n", p->id());
     for (auto c: q) {
         p = p->child(c);
         if (p == nullptr) break;
+        //printf("trie %d\n", p->id());
         if (p->port() != -1) result = p->port();
     }
     return result;
@@ -67,6 +105,62 @@ int Trie::query_port(const std::string &q)
 Trie::Trie(const Trie &rhs)
 {
     this->m_root = rhs.m_root->clone_recursive();
+}
+
+size_t _get_size(std::shared_ptr<TrieNode> p)
+{
+    if (!p) return 0;
+    size_t res = 1;
+    for (auto iter: p->childs()) {
+        res += _get_size(iter.second);
+    }
+    return res;
+}
+
+size_t Trie::get_size()
+{
+    return _get_size(m_root);
+}
+
+int _get_largest_id(std::shared_ptr<TrieNode> p)
+{
+    int res = std::numeric_limits<int>::lowest();
+    if (!p) return res;
+    res = std::max(res, p->id());
+    for (auto iter: p->childs()) {
+        res = std::max(res, _get_largest_id(iter.second));
+        res = std::max(res, p->id() + iter.first);
+    }
+    return res;
+}
+
+void _dump_to_stt(std::shared_ptr<TrieNode> p, std::vector<STTEntry> &stt,
+        std::vector<int> &ports)
+{
+    if (!p) return;
+    ports[p->id()] = p->port();
+    for (auto iter: p->childs()) {
+        int idx = p->id() + iter.first;
+        assert(!stt[idx].valid);
+        stt[idx].valid = true;
+        stt[idx].c = iter.first;
+        stt[idx].child_id = iter.second->id();
+        _dump_to_stt(iter.second, stt, ports);
+    }
+}
+
+void Trie::construct_stt(STT &stt)
+{
+    allocate_id();
+    size_t stt_size = _get_largest_id(m_root) + 1;
+
+    stt.entries.resize(stt_size);
+    stt.ports.resize(stt_size);
+    memset(stt.entries.data(), 0, sizeof(STTEntry) * stt_size);
+    memset(stt.ports.data(), 0, sizeof(int) * stt_size);
+
+    stt.root_id = m_root->id();
+    _dump_to_stt(m_root, stt.entries, stt.ports);
 }
 
 /// Trie Node

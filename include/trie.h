@@ -5,6 +5,8 @@
 #include <map>
 #include <memory>
 
+#include "common.h"
+
 class TrieNode;
 
 class Trie {
@@ -15,11 +17,16 @@ class Trie {
 
         void load_file(const std::string &fib_fname);
         void insert_entry(const std::string &path, int port);
-        int query_port(const std::string &q);
+        int query_port(const std::string &q) const;
+
+        void construct_stt(STT &stt);
 
         void aggregate_and_export(const std::string &fib_fname);
+        size_t get_size();
+
     private:
         std::shared_ptr<TrieNode> m_root;
+        void allocate_id();
 };
 
 class TrieNode {
@@ -39,7 +46,15 @@ class TrieNode {
         int port() const {
             return m_port;
         }
+        TrieNode &id(int id) {
+            m_id = id;
+            return *this;
+        }
+        int id() const {
+            return m_id;
+        }
     private:
         std::map<char, std::shared_ptr<TrieNode>> m_childs;
         int m_port;
+        int m_id;
 };

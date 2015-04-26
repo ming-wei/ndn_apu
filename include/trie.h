@@ -23,6 +23,8 @@ class Trie {
 
         void aggregate_and_export(const std::string &fib_fname);
         size_t get_size();
+        std::shared_ptr<TrieNode> root() const
+        { return m_root; }
 
     private:
         std::shared_ptr<TrieNode> m_root;

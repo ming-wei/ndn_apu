@@ -1,11 +1,13 @@
-#include <CL/cl.hpp>
+#include <CL/cl.h>
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <fstream>
 #include <iostream>
 #include <cassert>
+#include <chrono>
 
 #include "trie.h"
 #include "common.h"
@@ -23,6 +25,7 @@ const char *kernel_sources = "\n" \
 "  if (i < count) output[i] = input[i] * input[i]; \n" \
 "} \n";
 
+/*
 void test_opencl()
 {
     int err;
@@ -86,6 +89,7 @@ void test_opencl()
             NULL, NULL));
     for (int i = 0; i < SIZE; ++i) printf("%f %f\n", data[i], results[i]);
 }
+*/
 
 void query_batched(Trie &trie, STT &stt, STT_GPU &stt_gpu)
 {
@@ -104,12 +108,22 @@ void query_batched(Trie &trie, STT &stt, STT_GPU &stt_gpu)
     size_t n = stt_gpu.n;
     res1.resize(n);
     res2.resize(n);
+    auto start_cpu = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < n; ++i)  {
         res1[i] = stt_query_port(stt, std::string(
                     stt_gpu.str_data + stt_gpu.barrier_data[i],
                     stt_gpu.str_data + stt_gpu.barrier_data[i+1]));
     }
+    auto end_cpu = std::chrono::high_resolution_clock::now();
+    auto time_cpu = std::chrono::duration_cast<std::chrono::microseconds>(
+            end_cpu - start_cpu).count();
+    clFinish(stt_gpu.commands);
+    auto start_apu = std::chrono::high_resolution_clock::now();
     stt_gpu.query();
+    auto end_apu = std::chrono::high_resolution_clock::now();
+    auto time_apu = std::chrono::duration_cast<std::chrono::microseconds>(
+            end_apu - start_apu).count();
+    printf("cpu_time=%f, apu_time=%f\n", (float)time_cpu, (float)time_apu);
     for (size_t i = 0; i < n; ++i) 
         res2[i] = stt_gpu.output_data[i];
     for (size_t i = 0; i < n; ++i) {
@@ -118,6 +132,15 @@ void query_batched(Trie &trie, STT &stt, STT_GPU &stt_gpu)
     printf("query batch finished\n");
 }
 
+void dfs(std::shared_ptr<TrieNode> p)
+{
+    int count = 0;
+    for (auto pii: p->childs()) {
+        ++count;
+        dfs(pii.second);
+    }
+    printf("%d ", count);
+}
 int main()
 {
     // test_opencl();
@@ -131,6 +154,8 @@ int main()
         fibs.push_back(os.str());
     }
     Trie trie(fibs);
+    //dfs(trie.root());
+    //return 0;
     STT stt;
     trie.construct_stt(stt);
     

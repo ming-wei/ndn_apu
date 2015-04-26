@@ -6,7 +6,6 @@ typedef struct STTEntry_t {
 } STTEntry;
 
 __kernel void query_kernel(
-        const int n,
         __global int *barrier,
         __global char *str,
         __global int *output,

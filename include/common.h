@@ -66,8 +66,8 @@ std::unique_ptr<T> make_unique(Args&&... args) {
 }
 }
 
-constexpr size_t BATCH_SIZE = 256;
-constexpr size_t QUERY_LEN = 256;
+constexpr size_t BATCH_SIZE = 16;
+constexpr size_t QUERY_LEN = 128;
 
 struct STTEntry {
     int c;
@@ -95,11 +95,11 @@ class STT_GPU {
         int *barrier_data;
         char *str_data;
         int *output_data;
-    private:
         cl_context context;
         cl_command_queue commands;
         cl_mem stt, ports;
         cl_program program;
+        cl_kernel kernel;
 
         cl_mem barrier, str, output;
 };

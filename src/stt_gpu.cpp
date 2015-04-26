@@ -23,7 +23,7 @@ void STT_GPU::init(const STT &stt_src)
     context = clCreateContext(NULL, 1, &device, NULL, NULL, &err);
     CK(err);
 
-    commands = clCreateCommandQueue(context, device, 0, &err);
+    commands = clCreateCommandQueueWithProperties(context, device, 0, &err);
     CK(err);
 
     size_t n = stt_src.entries.size();
@@ -89,6 +89,13 @@ void STT_GPU::init(const STT &stt_src)
         exit(1);
     }
 
+    kernel = clCreateKernel(program, "query_kernel", &err);
+    CK(err);
+    CK(clSetKernelArg(kernel, 0, sizeof(cl_mem), &barrier));
+    CK(clSetKernelArg(kernel, 1, sizeof(cl_mem), &str));
+    CK(clSetKernelArg(kernel, 2, sizeof(cl_mem), &output));
+    CK(clSetKernelArg(kernel, 3, sizeof(cl_mem), &stt));
+    CK(clSetKernelArg(kernel, 4, sizeof(cl_mem), &ports));
 }
 
 
@@ -112,16 +119,6 @@ cl_program STT_GPU::create_program_from_file(const char *filename, cl_int *err)
 
 void STT_GPU::query()
 {
-    cl_int err;
-    cl_kernel kernel;
-    kernel = clCreateKernel(program, "query_kernel", &err);
-    CK(err);
-    CK(clSetKernelArg(kernel, 0, sizeof(int), &n));
-    CK(clSetKernelArg(kernel, 1, sizeof(cl_mem), &barrier));
-    CK(clSetKernelArg(kernel, 2, sizeof(cl_mem), &str));
-    CK(clSetKernelArg(kernel, 3, sizeof(cl_mem), &output));
-    CK(clSetKernelArg(kernel, 4, sizeof(cl_mem), &stt));
-    CK(clSetKernelArg(kernel, 5, sizeof(cl_mem), &ports));
     size_t global_work_size = n, local_work_size = n;
     CK(clEnqueueNDRangeKernel(commands, kernel, 1, NULL, 
                 &global_work_size, &local_work_size, 0,

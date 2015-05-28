@@ -120,12 +120,14 @@ void query_batched(Trie &trie, STT &stt, STT_GPU &stt_gpu)
     clFinish(stt_gpu.commands);
     auto start_apu = std::chrono::high_resolution_clock::now();
     stt_gpu.query();
+    stt_gpu.begin_save();
     auto end_apu = std::chrono::high_resolution_clock::now();
     auto time_apu = std::chrono::duration_cast<std::chrono::microseconds>(
             end_apu - start_apu).count();
     printf("cpu_time=%f, apu_time=%f\n", (float)time_cpu, (float)time_apu);
     for (size_t i = 0; i < n; ++i) 
         res2[i] = stt_gpu.output_data[i];
+    stt_gpu.end_save();
     for (size_t i = 0; i < n; ++i) {
         assert(res1[i] == res2[i]);
     }
@@ -141,9 +143,13 @@ void dfs(std::shared_ptr<TrieNode> p)
     }
     printf("%d ", count);
 }
+
+void test_kernel_daemon();
+
 int main()
 {
     // test_opencl();
+    // test_kernel_daemon();
     /// constructing trie
     std::vector<std::string> fibs;
     for (int i = 1; i <= TIMES; ++i) {
@@ -180,23 +186,31 @@ int main()
     // initialize stt_gpu
     stt_gpu.n = 0;
     int offset = 0;
+
+    stt_gpu.begin_load();
     for (auto fname: traces) {
         std::cerr << "Querying " << fname << std::endl;
         std::ifstream is(fname);
         assert(is);
         while (is) {
             if (!is.getline(stt_gpu.str_data + offset, QUERY_LEN)) continue;
+
             stt_gpu.barrier_data[stt_gpu.n] = offset;
             ++stt_gpu.n;
             offset += strlen(stt_gpu.str_data + offset);
             if (stt_gpu.n == BATCH_SIZE) {
                 stt_gpu.barrier_data[stt_gpu.n] = offset;
+                stt_gpu.end_load();
+
                 query_batched(trie, stt, stt_gpu);
+
+                stt_gpu.begin_load();
                 stt_gpu.n = 0;
                 offset = 0;
             }
         }
     }
+    stt_gpu.end_load();
 }
 
 // vim: ft=cpp.doxygen

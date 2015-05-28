@@ -5,9 +5,10 @@ TARGET := $(BINDIR)/a.out
 
 SOURCES := $(shell find $(SRCDIR) -type f -name *.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.cpp=.o))
+KERNELS := $(shell find $(SRCDIR) -type f -name *.cl)
 
 DEPENDS := $(OBJECTS:.o=.d)
-CXXFLAGS := -Wall -Wextra -MMD -Iinclude -std=c++11 -O3
+CXXFLAGS := -Wall -Wextra -MMD -Iinclude -std=c++11 -g
 
 # set V='' to enable verbose output
 override V ?= @
@@ -20,7 +21,7 @@ $(TARGET): $(OBJECTS)
 	$(V)mkdir -p $(dir $@)
 	$(V)$(CXX) $^ -o $@ $(CXXFLAGS) -lOpenCL
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
+$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp $(KERNELS)
 	@echo "[c++] $<"
 	$(V)mkdir -p $(dir $@)
 	$(V)$(CXX) $< -c -o $@ $(CXXFLAGS) 

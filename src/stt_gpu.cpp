@@ -4,6 +4,34 @@
 #include <fstream>
 #include <cassert>
 
+void STT_GPU::begin_load()
+{
+    CK(clEnqueueSVMMap(commands, true, CL_MAP_WRITE,
+                barrier_data, sizeof(int) * (BATCH_SIZE + 1),
+                0, 0, 0));
+    CK(clEnqueueSVMMap(commands, true, CL_MAP_WRITE,
+                str_data, sizeof(char) * BATCH_SIZE * QUERY_LEN,
+                0, 0, 0));
+}
+
+void STT_GPU::end_load()
+{
+    CK(clEnqueueSVMUnmap(commands, barrier_data, 0, 0, 0));
+    CK(clEnqueueSVMUnmap(commands, str_data, 0, 0, 0));
+}
+
+
+void STT_GPU::begin_save()
+{
+    CK(clEnqueueSVMMap(commands, true, CL_MAP_READ,
+                output_data, sizeof(int) * BATCH_SIZE,
+                0, 0, 0));
+}
+
+void STT_GPU::end_save()
+{
+    CK(clEnqueueSVMUnmap(commands, output_data, 0, 0, 0));
+}
 void STT_GPU::init(const STT &stt_src)
 {
     cl_int err;
@@ -44,31 +72,16 @@ void STT_GPU::init(const STT &stt_src)
             sizeof(int) * n, stt_src.ports.data(), 0, NULL, NULL);
     CK(err);
 
-    barrier = clCreateBuffer(context,
-            CL_MEM_READ_ONLY | CL_MEM_USE_PERSISTENT_MEM_AMD,
-            sizeof(int) * BATCH_SIZE + 1, NULL, &err);
-    CK(err);
-    barrier_data = (int *)clEnqueueMapBuffer(commands, barrier,
-            CL_TRUE, CL_MAP_READ, 0, sizeof(int) * BATCH_SIZE + 1, 0,
-            NULL, NULL, &err);
+    barrier_data = (int *)clSVMAlloc(context, CL_MEM_READ_ONLY, sizeof(int) *
+            (BATCH_SIZE + 1), 0);
     CK(err);
 
-    str = clCreateBuffer(context,
-            CL_MEM_READ_ONLY | CL_MEM_USE_PERSISTENT_MEM_AMD,
-            sizeof(char) * BATCH_SIZE * QUERY_LEN, NULL, &err);
-    CK(err);
-    str_data = (char *)clEnqueueMapBuffer(commands, str,
-            CL_TRUE, CL_MAP_READ, 0, sizeof(char) * BATCH_SIZE * QUERY_LEN, 0,
-            NULL, NULL, &err);
+    str_data = (char *)clSVMAlloc(context, CL_MEM_READ_ONLY, sizeof(char) * 
+            BATCH_SIZE * QUERY_LEN, 0);
     CK(err);
 
-    output = clCreateBuffer(context,
-            CL_MEM_WRITE_ONLY | CL_MEM_USE_PERSISTENT_MEM_AMD,
-            sizeof(int) * BATCH_SIZE, NULL, &err);
-    CK(err);
-    output_data = (int *)clEnqueueMapBuffer(commands, output,
-            CL_TRUE, CL_MAP_WRITE, 0, sizeof(int) * BATCH_SIZE, 0,
-            NULL, NULL, &err);
+    output_data = (int *)clSVMAlloc(context, CL_MEM_WRITE_ONLY, sizeof(int) *
+            BATCH_SIZE, 0);
     CK(err);
     CK(clFinish(commands));
     /*
@@ -80,7 +93,7 @@ void STT_GPU::init(const STT &stt_src)
 
     program = create_program_from_file("src/kernel.cl", &err);
     CK(err);
-    err = clBuildProgram(program, 1, &device, 0, 0, 0);
+    err = clBuildProgram(program, 1, &device, "-cl-std=CL2.0", 0, 0);
     if (err != CL_SUCCESS) {
         size_t len;
         char buffer[2048];
@@ -91,9 +104,14 @@ void STT_GPU::init(const STT &stt_src)
 
     kernel = clCreateKernel(program, "query_kernel", &err);
     CK(err);
+    /*
     CK(clSetKernelArg(kernel, 0, sizeof(cl_mem), &barrier));
     CK(clSetKernelArg(kernel, 1, sizeof(cl_mem), &str));
     CK(clSetKernelArg(kernel, 2, sizeof(cl_mem), &output));
+    */
+    CK(clSetKernelArgSVMPointer(kernel, 0, barrier_data));
+    CK(clSetKernelArgSVMPointer(kernel, 1, str_data));
+    CK(clSetKernelArgSVMPointer(kernel, 2, output_data));
     CK(clSetKernelArg(kernel, 3, sizeof(cl_mem), &stt));
     CK(clSetKernelArg(kernel, 4, sizeof(cl_mem), &ports));
 }
@@ -119,7 +137,7 @@ cl_program STT_GPU::create_program_from_file(const char *filename, cl_int *err)
 
 void STT_GPU::query()
 {
-    size_t global_work_size = n, local_work_size = n;
+    size_t global_work_size = 128, local_work_size = 128;
     CK(clEnqueueNDRangeKernel(commands, kernel, 1, NULL, 
                 &global_work_size, &local_work_size, 0,
                 NULL, NULL));
@@ -128,7 +146,6 @@ void STT_GPU::query()
 
 void STT_GPU::fini()
 {
-    CK(clReleaseMemObject(barrier));
-    CK(clReleaseMemObject(str));
-    CK(clReleaseMemObject(output));
+    CK(clReleaseMemObject(stt));
+    CK(clReleaseMemObject(ports));
 }

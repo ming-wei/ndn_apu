@@ -66,7 +66,7 @@ std::unique_ptr<T> make_unique(Args&&... args) {
 }
 }
 
-constexpr size_t BATCH_SIZE = 16;
+constexpr size_t BATCH_SIZE = 4096;
 constexpr size_t QUERY_LEN = 128;
 
 struct STTEntry {
@@ -84,6 +84,10 @@ struct STT {
 
 class STT_GPU {
     public:
+        void begin_load();
+        void end_load();
+        void begin_save();
+        void end_save();
         void init(const STT &stt);
         void fini();
         void query();
@@ -97,11 +101,10 @@ class STT_GPU {
         int *output_data;
         cl_context context;
         cl_command_queue commands;
-        cl_mem stt, ports;
         cl_program program;
         cl_kernel kernel;
 
-        cl_mem barrier, str, output;
+        cl_mem stt, ports;
 };
 
 int stt_query_port(const STT &stt, const std::string &line);

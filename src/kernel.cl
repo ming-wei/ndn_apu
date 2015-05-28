@@ -5,6 +5,8 @@ typedef struct STTEntry_t {
     int padding;
 } STTEntry;
 
+const int BATCH_SIZE = 4096;
+
 __kernel void query_kernel(
         __global int *barrier,
         __global char *str,
@@ -13,6 +15,7 @@ __kernel void query_kernel(
         __global int *ports)
 {
     int i = get_global_id(0);
+    while (i < BATCH_SIZE) {
     int p = 0, res = ports[p];
     /*
     for (int p = 0; p < 100; ++p) {
@@ -35,6 +38,8 @@ __kernel void query_kernel(
         }
     }
     output[i] = res;
+    i += 128;
+    }
 }
 
 

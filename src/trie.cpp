@@ -6,6 +6,7 @@
 #include <memory>
 #include <set>
 #include <limits>
+#include <queue>
 #include <cstring>
 
 #include "common.h"
@@ -34,6 +35,28 @@ void allocate_recursive(std::shared_ptr<TrieNode> p, int &id,
     }
 }
 
+void allocate_bfs(std::shared_ptr<TrieNode> p, int &id,
+        std::set<int> &occupied)
+{
+    printf("allocate begin\n");
+    std::queue<std::shared_ptr<TrieNode>> Q;
+    Q.push(p);
+    while (!Q.empty()) {
+        p = Q.front();
+        Q.pop();
+        while (!can_allocate(p, id, occupied)) ++id;
+        p->id(id++);
+        for (auto it: p->childs()) {
+            char c = it.first;
+            occupied.insert(p->id() + c);
+        }
+        for (auto it: p->childs()) {
+            Q.push(it.second);
+        }
+    }
+    printf("allocate finish\n");
+}
+
 Trie::Trie(const std::vector<std::string> &fib_fnames)
 {
     std::cerr << "Constructing trie..." << std::endl;
@@ -50,7 +73,8 @@ void Trie::allocate_id()
 {
     std::set<int> occupied;
     int cur_id = 0;
-    allocate_recursive(m_root, cur_id, occupied);
+    //allocate_recursive(m_root, cur_id, occupied);
+    allocate_bfs(m_root, cur_id, occupied);
 }
 
 void Trie::load_file(const std::string &fib_fname)
